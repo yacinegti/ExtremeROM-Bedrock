@@ -45,35 +45,36 @@ BUILD()
     fi
 
     LOG "- Building ${INPUT_FILE//$WORK_DIR/}"
+# DEX format version might not be matching minSdkVersion, currently we handle
+# baksmali manually as apktool will by default use minSdkVersion when available
+# instead of the actual DEX format version used in the input apk
+if [ -d "$OUTPUT_PATH/smali" ]; then
+    local DEX_API_LEVEL
+    local DEX_FILENAME
 
-    # DEX format version might not be matching minSdkVersion, currently we handle
-    # baksmali manually as apktool will by default use minSdkVersion when available
-    # instead of the actual DEX format version used in the input apk
-    if [ -d "$OUTPUT_PATH/smali" ]; then
-        local DEX_API_LEVEL
-        local DEX_FILENAME
+    while IFS= read -r d; do
+        DEX_API_LEVEL="$(cat "$OUTPUT_PATH/../dex_api_version" 2> /dev/null)"
 
-        while IFS= read -r d; do
-            DEX_API_LEVEL="$(cat "$OUTPUT_PATH/../dex_api_version" 2> /dev/null)"
+        # Validate supported API levels
+        if [ ! "$DEX_API_LEVEL" ]; then
+            LOGE "Invalid DEX API level: $DEX_API_LEVEL"
+            exit 1
+        elif [[ "$DEX_API_LEVEL" -gt "35" ]]; then
+            LOGW "DEX API level $DEX_API_LEVEL is newer than supported. Proceeding anyway."
+        fi
 
-            # https://github.com/google/smali/blob/3.0.9/dexlib2/src/main/java/com/android/tools/smali/dexlib2/VersionMap.java#L55-L79
-            if [ ! "$DEX_API_LEVEL" ] || [[ "$DEX_API_LEVEL" -gt "35" ]]; then
-                LOGE "Unvalid DEX API level: $DEX_API_LEVEL"
-                exit 1
-            fi
+        if [[ "$d" == *"smali" ]]; then
+            DEX_FILENAME="classes.dex"
+        else
+            DEX_FILENAME="$(basename "${d//smali_/}").dex"
+        fi
 
-            if [[ "$d" == *"smali" ]]; then
-                DEX_FILENAME="classes.dex"
-            else
-                DEX_FILENAME="$(basename "${d//smali_/}").dex"
-            fi
+        EVAL "smali a -a \"$DEX_API_LEVEL\" -j \"$THREAD_COUNT\" -o \"$OUTPUT_PATH/$DEX_FILENAME\" \"$d\"" &
+    done < <(find "$OUTPUT_PATH" -maxdepth 1 -type d -name "smali*")
 
-            EVAL "smali a -a \"$DEX_API_LEVEL\" -j \"$THREAD_COUNT\" -o \"$OUTPUT_PATH/$DEX_FILENAME\" \"$d\"" &
-        done < <(find "$OUTPUT_PATH" -maxdepth 1 -type d -name "smali*")
-
-        # shellcheck disable=SC2046
-        wait $(jobs -p) || exit 1
-    fi
+    # shellcheck disable=SC2046
+    wait $(jobs -p) || exit 1
+fi
 
     # Copy original META-INF
     mkdir -p "$OUTPUT_PATH/build/apk"
