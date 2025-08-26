@@ -18,7 +18,7 @@
 # ExtremeROM configuration file for Exynos devices (essi)
 
 # Galaxy zflip 7 (One UI 8)
-SOURCE_CODENAME="B7"
+SOURCE_CODENAME="b7"
 SOURCE_FIRMWARE="SM-F766U1/XAA/351592891004963"
 SOURCE_EXTRA_FIRMWARES=()
 SOURCE_API_LEVEL=36
